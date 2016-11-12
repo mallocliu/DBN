@@ -1,16 +1,9 @@
-from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtWidgets import QMainWindow
 
-class Ui_Output(object):
-    def setupUi(self, Output):
-        Output.setObjectName("Output")
-        Output.resize(400, 300)
-        self.textEdit = QtWidgets.QTextEdit(Output)
-        self.textEdit.setGeometry(QtCore.QRect(0, 0, 400, 300))
-        self.textEdit.setObjectName("textEdit")
+from Output import Ui_Output
 
-        self.retranslateUi(Output)
-        QtCore.QMetaObject.connectSlotsByName(Output)
 
-    def retranslateUi(self, Output):
-        _translate = QtCore.QCoreApplication.translate
-        Output.setWindowTitle(_translate("Output", "评估报告"))
+class OutPutWindow(QMainWindow, Ui_Output):
+    def __init__(self, parent=None):
+        super(OutPutWindow, self).__init__(parent)
+        self.setupUi(self)

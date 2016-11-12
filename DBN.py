@@ -1,11 +1,11 @@
 """
 """
 from __future__ import print_function, division
+
 import sys
 import timeit
 
 import numpy
-
 import theano
 import theano.tensor as T
 from theano.sandbox.rng_mrg import MRG_RandomStreams
@@ -14,6 +14,7 @@ from logistic_sgd import LogisticRegression
 from mlp import HiddenLayer
 from rbm import RBM
 from utils import load_traindata, load_testdata
+
 
 # start-snippet-1
 
@@ -301,6 +302,24 @@ class runDBN():
             3: '合格',
             4: '不合格'
         }
+
+    def reset(self):
+        self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
+        self.datasets = []
+        self.n_train_batches = 0
+        self.count = 0
+        self.totalscore = 0
+        self.totalresult = ''
+        self.weight = []
+        self.score = []
+        self.indexname = []
+        self.rootindex = ''
+
+    def setIndexname(self, index):
+        self.indexname = index
+
+    def setRootIndex(self, index):
+        self.rootindex = index
 
     def reset(self):
         self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
