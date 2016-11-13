@@ -1,7 +1,8 @@
 import os
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
+
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 
 class SelectDialog(QDialog):
@@ -9,17 +10,17 @@ class SelectDialog(QDialog):
         super(SelectDialog, self).__init__(parent)
         self.path = os.getcwd()
         self.initUI()
-        self.setWindowTitle("选择")
+        self.setWindowTitle("Select")
         self.resize(240, 100)
 
     def initUI(self):
         grid = QGridLayout()
-        grid.addWidget(QLabel("路径："), 0, 0)
+        grid.addWidget(QLabel("Path："), 0, 0)
         self.pathLineEdit = QLineEdit()
         self.pathLineEdit.setFixedWidth(200)
         self.pathLineEdit.setText(self.path)
         grid.addWidget(self.pathLineEdit, 0, 1)
-        button = QPushButton("更改")
+        button = QPushButton("Change")
         button.clicked.connect(self.changePath)
         grid.addWidget(button, 0, 2)
         
@@ -37,7 +38,7 @@ class SelectDialog(QDialog):
         self.pathLineEdit.setText(self.path[0])
 
     def getPath(self):
-        return self.path
+        return self.path[0]
 
 
 class SaveDialog(QDialog):
@@ -45,17 +46,17 @@ class SaveDialog(QDialog):
         super(SaveDialog, self).__init__(parent)
         self.path = os.getcwd()
         self.initUI()
-        self.setWindowTitle("选择")
+        self.setWindowTitle("Select")
         self.resize(240, 100)
 
     def initUI(self):
         grid = QGridLayout()
-        grid.addWidget(QLabel("路径："), 0, 0)
+        grid.addWidget(QLabel("Path："), 0, 0)
         self.pathLineEdit = QLineEdit()
         self.pathLineEdit.setFixedWidth(200)
         self.pathLineEdit.setText(self.path)
         grid.addWidget(self.pathLineEdit, 0, 1)
-        button = QPushButton("更改")
+        button = QPushButton("Change")
         button.clicked.connect(self.changePath)
         grid.addWidget(button, 0, 2)
 

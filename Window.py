@@ -1,12 +1,14 @@
-from PyQt5.QtWidgets import QMainWindow
-
 from mainwindow import Ui_MainWindow
 
 
-class MainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
-        self.setupUi(self)
+class MainWindow(Ui_MainWindow):
+    def __init__(self, QMainWindow):
+        super().setupUi(QMainWindow)
+        self.push_editIndex.clicked.connect(self.preset)
+        self.push_resumeIndex.clicked.connect(self.treeReset)
+
+        self.push_resumeIndex.clicked.connect(self.comboBox_indexName.clear)
+        self.push_resumeIndex.clicked.connect(self.lineEdit_result.clear)
 
     def preset(self):
         treeitem = self.getIndexTree()
@@ -26,7 +28,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def getIndexName(self):
         treeitem = self.getIndexTree()
-        name = [(str(node.text(0)), 0) for node in treeitem]
+        name = [str(node.text(0)) for node in treeitem]
         return name
 
     def getRootIndexName(self):

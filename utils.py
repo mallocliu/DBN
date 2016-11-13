@@ -1,7 +1,7 @@
 import numpy
-from openpyxl import load_workbook
 import theano
 import theano.tensor as T
+from openpyxl import load_workbook
 
 
 def shared_dataset(data_xy, borrow=True):
@@ -41,8 +41,8 @@ def load_traindata(dataset):
 
     wb = load_workbook(filename=dataset, read_only=True)
     ws = wb['Sheet1']
-
-    columns = [chr(ord('A') + i) for i in range(ws.max_column - 1)]
+    feaNum = ws.max_column - 1
+    columns = [chr(ord('A') + i) for i in range(feaNum)]
     data = list()
     labels = list()
     for row in range(2, ws.max_row + 1):
@@ -69,7 +69,7 @@ def load_traindata(dataset):
     train_set = (data, labels)
     train_set_x, train_set_y = shared_dataset(train_set)
 
-    return train_set_x, train_set_y
+    return train_set_x, train_set_y, feaNum
 
 
 def load_testdata(dataset):

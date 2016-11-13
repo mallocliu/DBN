@@ -277,9 +277,9 @@ class DBN(object):
 
 class runDBN():
     def __init__(self):
-        self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
+        self.dbn = []
         self.datasets = []
-        self.n_train_batches = 0
+        self.n_train_batches = []
         self.count = 0
         self.totalscore = 0
         self.totalresult = ''
@@ -287,6 +287,7 @@ class runDBN():
         self.score = []
         self.indexname = []
         self.rootindex = ''
+        self.trained = []
         self.scoretable = {
             0: 95,
             1: 85,
@@ -304,7 +305,7 @@ class runDBN():
         }
 
     def reset(self):
-        self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
+        self.dbn = []
         self.datasets = []
         self.n_train_batches = 0
         self.count = 0
@@ -317,19 +318,13 @@ class runDBN():
 
     def setIndexname(self, index):
         self.indexname = index
+        self.trained = [0 for _ in index]
+        self.n_train_batches = [0 for _ in index]
+        self.dbn = [DBN(numpy_rng=numpy.random.RandomState(123)) for _ in index]
+
 
     def setRootIndex(self, index):
         self.rootindex = index
-
-    def reset(self):
-        self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
-        self.datasets = []
-        self.n_train_batches = 0
-        self.count = 0
-        self.totalscore = 0
-        self.totalresult = ''
-        self.weight = []
-        self.score = []
 
     def calc_count(self):
         return self.count
@@ -356,15 +351,19 @@ class runDBN():
                 self.totalresult = result[score_range]
                 return
 
-    def pretrain_DBN(self, ui, dialog_selectTrain):
+    def pretrain_DBN(self, ui, trainFilePath, trainIndex):
         pretraining_epochs = 100
         pretrain_lr = 0.01
         batch_size = 4
         k = 1
-        trainfile = dialog_selectTrain.getPath()
-        train_set_x, train_set_y = load_traindata(trainfile[0])
-        self.datasets = [(train_set_x, train_set_y)]
-        self.n_train_batches = train_set_x.get_value(borrow=True).shape[0] // batch_size
+        train_set_x, train_set_y, feaNum = load_traindata(trainFilePath)
+        # when we haven't trained this index, we trained it, otherwise refresh the datasets.
+        if self.trained[trainIndex]:
+            self.datasets[trainIndex] = (train_set_x, train_set_y)
+        else:
+            self.datasets.append((train_set_x, train_set_y))
+
+        self.n_train_batches[trainIndex] = train_set_x.get_value(borrow=True).shape[0] // batch_size
         hidden_layer_sizes = []
         if ui.checkBox_lv1.isChecked():
             hidden_layer_sizes.append(int(ui.lineEdit_lv1.text()))
@@ -374,25 +373,25 @@ class runDBN():
         # numpy random generator
         numpy_rng = numpy.random.RandomState(123)
         # construct the Deep Belief Network
-        self.dbn = DBN(numpy_rng=numpy_rng, n_ins=3,
-                       hidden_layers_sizes=hidden_layer_sizes,
-                       n_outs=5)
+        self.dbn[trainIndex] = DBN(numpy_rng=numpy_rng, n_ins=feaNum,
+                                   hidden_layers_sizes=hidden_layer_sizes,
+                                   n_outs=5)
 
         # start-snippet-2
         #########################
         # PRETRAINING THE MODEL #
         #########################
         print('... getting the pretraining functions')
-        pretraining_fns = self.dbn.pretraining_functions(train_set_x=train_set_x,
-                                                         batch_size=batch_size,
-                                                         k=k)
+        pretraining_fns = self.dbn[trainIndex].pretraining_functions(train_set_x=train_set_x,
+                                                                     batch_size=batch_size,
+                                                                     k=k)
         print('... pre-training the model')
         start_time = timeit.default_timer()
         # Pre-train layer-wise
-        for i in range(self.dbn.n_layers):
+        for i in range(self.dbn[trainIndex].n_layers):
             for epoch in range(pretraining_epochs):
                 c = []
-                for batch_index in range(self.n_train_batches):
+                for batch_index in range(self.n_train_batches[trainIndex]):
                     c.append(pretraining_fns[i](index=batch_index,
                                                 lr=pretrain_lr))
                 print('Pre-training layer %i, epoch %d, cost ' % (i, epoch), end=' ')
@@ -403,6 +402,8 @@ class runDBN():
               'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
         # end-snippet-2
 
+    # TODO make testing seperate from trainning process
+    # make datasets a list,double check.
     def test_DBN(self, ui, outui, dialog_selectTest):
         batch_size = 1
         finetune_lr = 0.1
