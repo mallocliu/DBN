@@ -8,13 +8,22 @@ class MainWindow(Ui_MainWindow):
         self.push_resumeIndex.clicked.connect(self.treeReset)
 
         self.push_resumeIndex.clicked.connect(self.comboBox_indexName.clear)
+        self.push_resumeIndex.clicked.connect(self.comboBox_testIndex.clear)
         self.push_resumeIndex.clicked.connect(self.lineEdit_result.clear)
+
+        self.command_startEvaluate.clicked.connect(
+            lambda: self.lineEdit_indexName_2.setText(self.comboBox_testIndex.currentText()))
+
+        self.comboBox_indexLevel.addItem('2', 2)
+        self.lineEdit_indexWeight.setText('1')
 
     def preset(self):
         treeitem = self.getIndexTree()
         self.comboBox_indexName.clear()
+        self.comboBox_testIndex.clear()
         for val, node in enumerate(treeitem):
             self.comboBox_indexName.insertItem(val, node.text(0))
+            self.comboBox_testIndex.insertItem(val, node.text(0))
 
     def getIndexTree(self):
         index = self.comboBox_indexLevel.currentData()

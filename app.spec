@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['app.py'],
-             pathex=['D:\\Project\\dbnui'],
+             pathex=['D:\\PycharmProjects\\DBN'],
              binaries=[],
              datas=[],
              hiddenimports=[],

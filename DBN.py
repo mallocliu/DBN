@@ -231,11 +231,11 @@ class DBN(object):
             updates=updates,
             givens={
                 self.x: train_set_x[
-                    index * batch_size: (index + 1) * batch_size
-                ],
+                        index * batch_size: (index + 1) * batch_size
+                        ],
                 self.y: train_set_y[
-                    index * batch_size: (index + 1) * batch_size
-                ]
+                        index * batch_size: (index + 1) * batch_size
+                        ]
             }
         )
 
@@ -244,11 +244,11 @@ class DBN(object):
             self.errors,
             givens={
                 self.x: test_set_x[
-                    index * batch_size: (index + 1) * batch_size
-                ],
+                        index * batch_size: (index + 1) * batch_size
+                        ],
                 self.y: test_set_y[
-                    index * batch_size: (index + 1) * batch_size
-                ]
+                        index * batch_size: (index + 1) * batch_size
+                        ]
             }
         )
 
@@ -257,8 +257,8 @@ class DBN(object):
             self.predict,
             givens={
                 self.x: test_set_x[
-                    index * batch_size: (index + 1) * batch_size
-                ],
+                        index * batch_size: (index + 1) * batch_size
+                        ],
             }
         )
 
@@ -270,8 +270,10 @@ class DBN(object):
         def test_score():
             return [test_score_i(i) for i in range(n_test_batches)]
 
+        # TODO modify test_label to make predict() correct
         def test_label():
             return [test_label_i(i) for i in range(n_test_batches)]
+
         return train_fn, test_score, test_label
 
 
@@ -279,8 +281,8 @@ class runDBN():
     def __init__(self):
         self.dbn = []
         self.datasets = []
+        self.rawdata = []
         self.n_train_batches = []
-        self.count = 0
         self.totalscore = 0
         self.totalresult = ''
         self.weight = []
@@ -288,6 +290,7 @@ class runDBN():
         self.indexname = []
         self.rootindex = ''
         self.trained = []
+        self.tested = []
         self.scoretable = {
             0: 95,
             1: 85,
@@ -307,33 +310,44 @@ class runDBN():
     def reset(self):
         self.dbn = []
         self.datasets = []
-        self.n_train_batches = 0
-        self.count = 0
+        self.rawdata = []
+        self.n_train_batches = []
         self.totalscore = 0
         self.totalresult = ''
         self.weight = []
         self.score = []
         self.indexname = []
+        self.trained = []
+        self.tested = []
         self.rootindex = ''
+
+    def resetTest(self):
+        self.totalresult = ''
+        self.totalscore = 0
+        self.weight = []
+        self.score = []
+        self.tested = [False for _ in self.indexname]
+        self.datasets = [[data[0]] for data in self.datasets]
+
+    def retrain(self, index):
+        self.setIndexname(index)
+        self.resetTest()
 
     def setIndexname(self, index):
         self.indexname = index
-        self.trained = [0 for _ in index]
+        self.trained = [False for _ in index]
+        self.tested = [False for _ in index]
         self.n_train_batches = [0 for _ in index]
         self.dbn = [DBN(numpy_rng=numpy.random.RandomState(123)) for _ in index]
-
 
     def setRootIndex(self, index):
         self.rootindex = index
 
-    def calc_count(self):
-        return self.count
-
     def calc_totalscore(self):
         tmp = 0.0
-        for i in range(self.count):
+        for i in range(len(self.indexname)):
             tmp += self.weight[i] * self.score[i]
-        self.totalscore = tmp/sum(self.weight)
+        self.totalscore = tmp / sum(self.weight)
 
     def calc_totalresult(self):
         result = {
@@ -356,13 +370,16 @@ class runDBN():
         pretrain_lr = 0.01
         batch_size = 4
         k = 1
-        train_set_x, train_set_y, feaNum = load_traindata(trainFilePath)
+        train_set_x, train_set_y, feaNum, rawdata = load_traindata(trainFilePath)
         # when we haven't trained this index, we trained it, otherwise refresh the datasets.
         if self.trained[trainIndex]:
-            self.datasets[trainIndex] = (train_set_x, train_set_y)
+            self.datasets[trainIndex] = [(train_set_x, train_set_y)]
+            self.rawdata[trainIndex] = rawdata
         else:
-            self.datasets.append((train_set_x, train_set_y))
+            self.datasets.append([(train_set_x, train_set_y)])
+            self.rawdata.append(rawdata)
 
+        self.trained[trainIndex] = True
         self.n_train_batches[trainIndex] = train_set_x.get_value(borrow=True).shape[0] // batch_size
         hidden_layer_sizes = []
         if ui.checkBox_lv1.isChecked():
@@ -402,19 +419,18 @@ class runDBN():
               'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
         # end-snippet-2
 
-    # TODO make testing seperate from trainning process
-    # make datasets a list,double check.
-    def test_DBN(self, ui, outui, dialog_selectTest):
-        batch_size = 1
+    def test_DBN(self, ui, outui, testFilePath, testIndex):
+        batch_size = 4
         finetune_lr = 0.1
         training_epochs = 1000
-        testfile = dialog_selectTest.getPath()
-        test_set_x, test_set_y = load_testdata(testfile[0])
-        self.datasets.append((test_set_x, test_set_y))
+        # testfile = dialog_selectTest.getPath()
+        self.tested[testIndex] = True
+        test_set_x, test_set_y = load_testdata(testFilePath, self.rawdata[testIndex], batch_size)
+        self.datasets[testIndex].append((test_set_x, test_set_y))
         # get the training, validation and testing function for the model
         print('... getting the finetuning functions')
-        train_fn, test_model, predict_model = self.dbn.build_finetune_functions(
-            datasets=self.datasets,
+        train_fn, test_model, predict_model = self.dbn[testIndex].build_finetune_functions(
+            datasets=self.datasets[testIndex],
             batch_size=batch_size,
             learning_rate=finetune_lr
         )
@@ -426,7 +442,7 @@ class runDBN():
         epoch = 0
         while (epoch < training_epochs):
             epoch = epoch + 1
-            for minibatch_index in range(self.n_train_batches):
+            for minibatch_index in range(self.n_train_batches[testIndex]):
                 train_fn(minibatch_index)
 
         end_time = timeit.default_timer()
@@ -438,14 +454,13 @@ class runDBN():
         for eachbatch in predict_label:
             last_label.extend(eachbatch.tolist())
 
-        ui.lineEdit_result.setText(str(self.translate_result[last_label[0]]))
-        outui.textEdit.append('指标名称 : {}'.format(ui.lineEdit_indexName_2.text()))
+        ui.lineEdit_result.setText(str(self.translate_result[last_label[-1]]))
+        outui.textEdit.append('指标名称 : {}'.format(ui.comboBox_testIndex.currentText()))
         outui.textEdit.append('评估结果 : {}'.format(ui.lineEdit_result.text()))
         outui.textEdit.append('指标权重 ：{}\n'.format(ui.lineEdit_indexWeight.text()))
         self.weight.append(float(ui.lineEdit_indexWeight.text()))
         self.score.append(self.scoretable[last_label[0]])
-        self.count += 1
-        if self.calc_count() == len(self.indexname):
+        if not (False in self.tested):
             self.calc_totalscore()
             self.calc_totalresult()
             outui.textEdit.append('指标名称 : {}'.format(self.rootindex))

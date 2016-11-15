@@ -61,18 +61,24 @@ def load_traindata(dataset):
     # print(dataSize)
     minval = data.min(axis=0)
     maxval = data.max(axis=0)
+    rawdata = data.copy()
 
     ###normaolization
     for row in range(0, dataSize[0]):
         for col in range(0, dataSize[1]):
             data[row][col] = (data[row][col] - minval[col]) / (maxval[col] - minval[col])
+
     train_set = (data, labels)
     train_set_x, train_set_y = shared_dataset(train_set)
 
-    return train_set_x, train_set_y, feaNum
+    return train_set_x, train_set_y, feaNum, rawdata
 
 
-def load_testdata(dataset):
+# TODO: solve logical error of normallization in load_testdata
+
+
+def load_testdata(dataset, data, batch_size):
+
     ''' Loads the dataset
 
     :type dataset: string
@@ -92,28 +98,31 @@ def load_testdata(dataset):
 
     wb = load_workbook(filename=dataset, read_only=True)
     ws = wb['Sheet1']
-    data = list()
-    labels = [0]  # give all the test label with 0 just for completeness
+    testdata = list()
+    labels = [0 for _ in range(batch_size)]  # give all the test label with 0 just for completeness
     columns = [chr(ord('A') + i) for i in range(ws.max_column)]
     tmp = []
     for column in columns:
         cell_name = "{}{}".format(column, 2)  # give 2 because we only have 1 test sample
         tmp.append(ws[cell_name].value)
-    data.append(tmp)
-    data = numpy.array(data)
+    testdata.append(tmp)
+    testdata = numpy.array(testdata)
     labels = numpy.array(labels)
+    data = numpy.vstack((data, testdata))
     dataSize = data.shape
 
-    # print(dataSize)
+    # print(testdataSize)
     minval = data.min(axis=0)
     maxval = data.max(axis=0)
 
     ###normaolization
-    for row in range(0, dataSize[0]):
-        for col in range(0, dataSize[1]):
-            data[row][col] = (data[row][col] - minval[col]) / (maxval[col] - minval[col])
+    for col in range(dataSize[1]):
+        testdata[0][col] = (testdata[0][col] - minval[col]) / (maxval[col] - minval[col])
 
-    test_set = (data, labels)
+    for i in range(batch_size - 1):
+        testdata = numpy.row_stack([testdata, testdata])
+
+    test_set = (testdata, labels)
 
     test_set_x, test_set_y = shared_dataset(test_set)
     return test_set_x, test_set_y
