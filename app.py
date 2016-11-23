@@ -1,5 +1,3 @@
-import sys
-
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
 from DBN import *
@@ -19,7 +17,6 @@ if __name__ == '__main__':
     dialog_selectTest = SelectDialog()
     dialog_save = SaveDialog()
     window.show()
-
     ui.pushButton_selectTrain.clicked.connect(dialog_selectTrain.exec)
     ui.pushButton_selectEvaluate.clicked.connect(dialog_selectTest.exec)
     ui.push_printresult.clicked.connect(dialog_save.exec)

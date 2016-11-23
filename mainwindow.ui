@@ -22,12 +22,12 @@
      <rect>
       <x>350</x>
       <y>20</y>
-      <width>241</width>
+      <width>331</width>
       <height>41</height>
      </rect>
     </property>
     <property name="text">
-     <string>基于深度学习的效能评估软件</string>
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:16pt; font-weight:600;&quot;&gt;基于深度学习的效能评估软件&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
     <property name="textFormat">
      <enum>Qt::RichText</enum>
@@ -63,7 +63,7 @@
        <rect>
         <x>130</x>
         <y>30</y>
-        <width>91</width>
+        <width>101</width>
         <height>21</height>
        </rect>
       </property>
@@ -73,7 +73,7 @@
        <rect>
         <x>130</x>
         <y>80</y>
-        <width>91</width>
+        <width>101</width>
         <height>21</height>
        </rect>
       </property>
@@ -268,8 +268,8 @@
      <widget class="QLabel" name="label_testIndexName">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>70</y>
+        <x>60</x>
+        <y>30</y>
         <width>61</width>
         <height>20</height>
        </rect>
@@ -284,8 +284,8 @@
      <widget class="QLabel" name="label_indexweight">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>120</y>
+        <x>60</x>
+        <y>80</y>
         <width>61</width>
         <height>20</height>
        </rect>
@@ -300,8 +300,8 @@
      <widget class="QLineEdit" name="lineEdit_indexWeight">
       <property name="geometry">
        <rect>
-        <x>90</x>
-        <y>120</y>
+        <x>130</x>
+        <y>80</y>
         <width>101</width>
         <height>21</height>
        </rect>
@@ -310,8 +310,8 @@
      <widget class="QComboBox" name="comboBox_testIndex">
       <property name="geometry">
        <rect>
-        <x>90</x>
-        <y>70</y>
+        <x>130</x>
+        <y>30</y>
         <width>101</width>
         <height>21</height>
        </rect>
@@ -321,7 +321,7 @@
       <property name="geometry">
        <rect>
         <x>440</x>
-        <y>60</y>
+        <y>30</y>
         <width>121</width>
         <height>31</height>
        </rect>
@@ -377,8 +377,8 @@
      <widget class="QLineEdit" name="lineEdit_indexName_2">
       <property name="geometry">
        <rect>
-        <x>90</x>
-        <y>70</y>
+        <x>130</x>
+        <y>30</y>
         <width>101</width>
         <height>20</height>
        </rect>
@@ -390,8 +390,8 @@
      <widget class="QLineEdit" name="lineEdit_result">
       <property name="geometry">
        <rect>
-        <x>90</x>
-        <y>120</y>
+        <x>130</x>
+        <y>80</y>
         <width>101</width>
         <height>21</height>
        </rect>
@@ -400,8 +400,8 @@
      <widget class="QLabel" name="label_testIndexName_2">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>70</y>
+        <x>60</x>
+        <y>30</y>
         <width>61</width>
         <height>20</height>
        </rect>
@@ -416,8 +416,8 @@
      <widget class="QLabel" name="label_indexweight_2">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>120</y>
+        <x>60</x>
+        <y>80</y>
         <width>61</width>
         <height>20</height>
        </rect>
@@ -427,6 +427,19 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="push_save">
+      <property name="geometry">
+       <rect>
+        <x>440</x>
+        <y>30</y>
+        <width>121</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>保存现场</string>
       </property>
      </widget>
     </widget>
@@ -835,7 +848,7 @@
     <widget class="QPushButton" name="push_editIndex">
      <property name="geometry">
       <rect>
-       <x>40</x>
+       <x>20</x>
        <y>300</y>
        <width>75</width>
        <height>23</height>
@@ -848,7 +861,7 @@
     <widget class="QPushButton" name="push_resumeIndex">
      <property name="geometry">
       <rect>
-       <x>190</x>
+       <x>110</x>
        <y>300</y>
        <width>75</width>
        <height>23</height>
@@ -856,6 +869,19 @@
      </property>
      <property name="text">
       <string>重置</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="push_reloadIndex">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>300</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>恢复现场</string>
      </property>
     </widget>
    </widget>

@@ -270,7 +270,6 @@ class DBN(object):
         def test_score():
             return [test_score_i(i) for i in range(n_test_batches)]
 
-        # TODO modify test_label to make predict() correct
         def test_label():
             return [test_label_i(i) for i in range(n_test_batches)]
 

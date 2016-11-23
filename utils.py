@@ -74,9 +74,6 @@ def load_traindata(dataset):
     return train_set_x, train_set_y, feaNum, rawdata
 
 
-# TODO: solve logical error of normallization in load_testdata
-
-
 def load_testdata(dataset, data, batch_size):
 
     ''' Loads the dataset
