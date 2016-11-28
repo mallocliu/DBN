@@ -27,9 +27,6 @@ if __name__ == '__main__':
     ui.push_editIndex.clicked.connect(lambda: dbn.setIndexname(ui.getIndexName()))
     ui.push_editIndex.clicked.connect(lambda: dbn.setRootIndex(ui.getRootIndexName()))
 
-    ui.push_resumeIndex.clicked.connect(dbn.reset)
-    ui.push_resumeIndex.clicked.connect(outui.textEdit.clear)
-
     ui.push_retrain.clicked.connect(ui.lineEdit_result.clear)
     ui.push_retrain.clicked.connect(outui.textEdit.clear)
     ui.push_retrain.clicked.connect(lambda: dbn.retrain(ui.getIndexName()))
