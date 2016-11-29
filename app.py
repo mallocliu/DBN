@@ -24,8 +24,8 @@ if __name__ == '__main__':
     dialog_save.accepted.connect(lambda: dialog_save.printout(outui.textEdit.toPlainText()))
     ui.push_showresult.clicked.connect(outwindow.show)
 
-    ui.push_editIndex.clicked.connect(lambda: dbn.setIndexname(ui.getIndexName()))
-    ui.push_editIndex.clicked.connect(lambda: dbn.setRootIndex(ui.getRootIndexName()))
+    # ui.push_editIndex.clicked.connect(lambda: dbn.setIndexname(ui.getIndexName()))
+    # ui.push_editIndex.clicked.connect(lambda: dbn.setRootIndex(ui.getRootIndexName()))
 
     ui.push_retrain.clicked.connect(ui.lineEdit_result.clear)
     ui.push_retrain.clicked.connect(outui.textEdit.clear)
