@@ -15,7 +15,6 @@ from mlp import HiddenLayer
 from rbm import RBM
 from utils import load_traindata, load_testdata
 
-
 # start-snippet-1
 
 
@@ -328,9 +327,11 @@ class runDBN():
         self.tested = [False for _ in self.indexname]
         self.datasets = [[data[0]] for data in self.datasets]
 
-    def retrain(self, index):
-        self.setIndexname(index)
-        self.resetTest()
+    def retrain(self, MainWindow):
+        trainIndex = MainWindow.comboBox_indexName.currentIndex()
+        self.trained[trainIndex] = False
+        name = MainWindow.comboBox_indexName.currentText().split(' ')
+        MainWindow.comboBox_indexName.setItemText(trainIndex, name[0])
 
     def setIndexname(self, index):
         self.indexname = index
@@ -364,11 +365,14 @@ class runDBN():
                 self.totalresult = result[score_range]
                 return
 
-    def pretrain_DBN(self, ui, trainFilePath, trainIndex):
+    def pretrain_DBN(self, MainWindow):
         pretraining_epochs = 100
         pretrain_lr = 0.01
         batch_size = 4
         k = 1
+        trainFilePath = MainWindow.dialog_selectTrain.getPath()
+        trainIndex = MainWindow.comboBox_indexName.currentIndex()
+
         train_set_x, train_set_y, feaNum, rawdata = load_traindata(trainFilePath)
         # when we haven't trained this index, we trained it, otherwise refresh the datasets.
         if self.trained[trainIndex]:
@@ -381,11 +385,11 @@ class runDBN():
         self.trained[trainIndex] = True
         self.n_train_batches[trainIndex] = train_set_x.get_value(borrow=True).shape[0] // batch_size
         hidden_layer_sizes = []
-        if ui.checkBox_lv1.isChecked():
-            hidden_layer_sizes.append(int(ui.lineEdit_lv1.text()))
+        if MainWindow.checkBox_lv1.isChecked():
+            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv1.text()))
 
-        if ui.checkBox_lv2.isChecked():
-            hidden_layer_sizes.append(int(ui.lineEdit_lv2.text()))
+        if MainWindow.checkBox_lv2.isChecked():
+            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv2.text()))
         # numpy random generator
         numpy_rng = numpy.random.RandomState(123)
         # construct the Deep Belief Network
@@ -417,6 +421,8 @@ class runDBN():
         print('The pretraining code for file ' +
               'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
         # end-snippet-2
+        name = MainWindow.comboBox_indexName.currentText()
+        MainWindow.comboBox_indexName.setItemText(trainIndex, name + ' (*)')
 
     def test_DBN(self, ui, outui, testFilePath, testIndex):
         batch_size = 4

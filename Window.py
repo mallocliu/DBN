@@ -2,60 +2,55 @@ import json
 from collections import deque, OrderedDict
 
 from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QMainWindow
 
-from dialog import SelectDialog
+from DBN import runDBN
+from dialog import SelectDialog, SaveDialog
 from mainwindow import Ui_MainWindow
+from outText import OutPutWindow
 
 
 class MainWindow(Ui_MainWindow):
-    def __init__(self, QMainWindow):
-        super().setupUi(QMainWindow)
-        self.dialog_loadindex = SelectDialog()  # select index file
-        self.push_editIndex.clicked.connect(self.setindex)
-        self.command_startEvaluate.clicked.connect(
-            lambda: self.lineEdit_indexName_2.setText(self.comboBox_testIndex.currentText()))
-        self.push_selectIndex.clicked.connect(self.loadindex)
+    def __init__(self, window):
+        super().setupUi(window)
         self.indexWidget = []
         self.indexname = set()
         self.level = 0
+        self.dbn = runDBN()
 
-    def preset(self):
-        treeitem = self.getIndexTree()
-        self.comboBox_indexName.clear()
-        self.comboBox_testIndex.clear()
-        for val, node in enumerate(treeitem):
-            self.comboBox_indexName.insertItem(val, node.text(0))
-            self.comboBox_testIndex.insertItem(val, node.text(0))
+        self.dialog_loadindex = SelectDialog()  # select index file
+        self.push_selectIndex.clicked.connect(self.loadindex)
+        self.push_editIndex.clicked.connect(self.setindex)
 
-    def getIndexTree(self):
-        index = self.comboBox_indexLevel.currentData()
-        root = self.tree_index.topLevelItem(0)
-        treeitem = [root]
-        for times in range(index - 1):
-            # treeitem holds all the valid level 2 index
-            treeitem = [node.child(i) for node in treeitem for i in range(node.childCount()) if
-                        node.child(i).text(0) != '//']
-        return treeitem
+        self.push_editIndex.clicked.connect(lambda: self.dbn.setIndexname(self.indexname))
 
-    def getIndexName(self):
-        treeitem = self.getIndexTree()
-        name = [str(node.text(0)) for node in treeitem]
-        return name
+        self.command_startEvaluate.clicked.connect(
+            lambda: self.lineEdit_indexName_2.setText(self.comboBox_testIndex.currentText()))
+
+        self.dialog_selectTrain = SelectDialog()
+        self.dialog_selectTest = SelectDialog()
+        self.dialog_save = SaveDialog()
+
+        self.pushButton_selectTrain.clicked.connect(self.dialog_selectTrain.exec)
+        self.pushButton_selectEvaluate.clicked.connect(self.dialog_selectTest.exec)
+        self.push_printresult.clicked.connect(self.dialog_save.exec)
+
+        self.outwindow = QMainWindow()
+        self.outui = OutPutWindow(self.outwindow)
+        self.dialog_save.accepted.connect(lambda: self.dialog_save.printout(self.outui.textEdit.toPlainText()))
+        self.push_showresult.clicked.connect(self.outwindow.show)
+
+        self.command_startTrain.clicked.connect(
+            lambda: self.dbn.pretrain_DBN(self))
+        self.command_startEvaluate.clicked.connect(
+            lambda: self.dbn.test_DBN(self, self.outui, self.dialog_selectTest.getPath(),
+                                      self.comboBox_testIndex.currentIndex()))
+
+        self.push_retrain.clicked.connect(lambda: self.dbn.retrain(self))
 
     def getRootIndexName(self):
         root = self.tree_index.topLevelItem(0)
         return root.text(0)
-
-    def treeReset(self):
-        resetStr = '/'
-        root = self.tree_index.topLevelItem(0)
-        root.setText(0, resetStr)
-        treeitem = [root]
-        for level in range(2):
-            treeitem = [node.child(i) for node in treeitem for i in range(node.childCount())]
-            resetStr += '/'
-            for node in treeitem:
-                node.setText(0, resetStr)
 
     def buildTree(self, rootindex, root):
         q = deque()
