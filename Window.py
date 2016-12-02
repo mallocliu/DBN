@@ -15,6 +15,7 @@ class MainWindow(Ui_MainWindow):
         super().setupUi(window)
         self.indexWidget = []
         self.indexname = set()
+        self.indexweight = []
         self.level = 0
         self.dbn = runDBN()
 
@@ -43,8 +44,7 @@ class MainWindow(Ui_MainWindow):
         self.command_startTrain.clicked.connect(
             lambda: self.dbn.pretrain_DBN(self))
         self.command_startEvaluate.clicked.connect(
-            lambda: self.dbn.test_DBN(self, self.outui, self.dialog_selectTest.getPath(),
-                                      self.comboBox_testIndex.currentIndex()))
+            lambda: self.dbn.test_DBN(self))
 
         self.push_retrain.clicked.connect(lambda: self.dbn.retrain(self))
 
@@ -90,10 +90,12 @@ class MainWindow(Ui_MainWindow):
                     parent = node.parent()
                     if not parent.text(0) in self.indexname:
                         self.indexname.add(parent.text(0))
+                        self.indexweight.append(parent.text(1))
                         self.indexWidget.append(parent)
                 break
 
         for val, node in enumerate(self.indexWidget):
             self.comboBox_indexName.insertItem(val, node.text(0))
+            self.comboBox_testIndex.insertItem(val, node.text(0))
 
         self.comboBox_indexLevel.insertItem(0, str(level))

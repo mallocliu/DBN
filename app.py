@@ -9,7 +9,4 @@ if __name__ == '__main__':
     window = QMainWindow()
     ui = MainWindow(window)
     window.show()
-    # ui.push_retest.clicked.connect(ui.lineEdit_result.clear)
-    # ui.push_retest.clicked.connect(outui.textEdit.clear)
-    # ui.push_retest.clicked.connect(dbn.resetTest)
     sys.exit(app.exec_())
