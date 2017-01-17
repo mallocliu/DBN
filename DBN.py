@@ -15,6 +15,7 @@ from mlp import HiddenLayer
 from rbm import RBM
 from utils import load_traindata, load_testdata
 
+
 # start-snippet-1
 
 
@@ -283,7 +284,6 @@ class runDBN():
         self.n_train_batches = []
         self.totalscore = 0
         self.totalresult = ''
-        self.weight = []
         self.score = []
         self.indexname = []
         self.rootindex = ''
@@ -305,33 +305,12 @@ class runDBN():
             4: '不合格'
         }
 
-    def reset(self):
-        self.dbn = []
-        self.datasets = []
-        self.rawdata = []
-        self.n_train_batches = []
-        self.totalscore = 0
-        self.totalresult = ''
-        self.weight = []
-        self.score = []
-        self.indexname = []
-        self.trained = []
-        self.tested = []
-        self.rootindex = ''
-
     def resetTest(self):
         self.totalresult = ''
         self.totalscore = 0
-        self.weight = []
         self.score = []
         self.tested = [False for _ in self.indexname]
         self.datasets = [[data[0]] for data in self.datasets]
-
-    def retrain(self, MainWindow):
-        trainIndex = MainWindow.comboBox_indexName.currentIndex()
-        self.trained[trainIndex] = False
-        name = MainWindow.comboBox_indexName.currentText().split(' ')
-        MainWindow.comboBox_indexName.setItemText(trainIndex, name[0])
 
     def setIndexname(self, index):
         self.indexname = index
@@ -343,13 +322,32 @@ class runDBN():
     def setRootIndex(self, index):
         self.rootindex = index
 
-    def calc_totalscore(self):
-        tmp = 0.0
-        for i in range(len(self.indexname)):
-            tmp += self.weight[i] * self.score[i]
-        self.totalscore = tmp / sum(self.weight)
+    def calc_totalscore(self, MainWindow):
+        lv = MainWindow.level - 1
+        score = self.score
+        while lv != 1:  # not in the root level
+            lv -= 1
+            tmpscore = []
+            fatherwidget = MainWindow.get_all_level_k_widget(lv)
+            for node in fatherwidget:
+                tmp = 0.0
+                sum_weight = 0
+                childNum = node.childCount()
+                for val in range(childNum):
+                    childnode = node.child(val)
+                    tmp += score[val] * int(childnode.text(1))
+                    sum_weight += int(childnode.text(1))
+                tmpscore.append(tmp / sum_weight)
+                result = self.calc_result(tmpscore[-1])
+                self.print_result(MainWindow, node.text(0), result, node.text(1))
+            score = tmpscore
 
-    def calc_totalresult(self):
+    def print_result(self, MainWindow, index, result, weight):
+        MainWindow.outui.textEdit.append('指标名称 : {}'.format(index))
+        MainWindow.outui.textEdit.append('评估结果 : {}'.format(result))
+        MainWindow.outui.textEdit.append('指标权重 ：{}\n'.format(weight))
+
+    def calc_result(self, score):
         result = {
             (90, 100): '优秀',
             (80, 90): '良好',
@@ -361,18 +359,15 @@ class runDBN():
         key = [i for i in key]
         key.sort(key=lambda x: x[0], reverse=True)
         for score_range in key:
-            if self.totalscore in range(score_range[0], score_range[1]):
-                self.totalresult = result[score_range]
-                return
+            if score in range(score_range[0], score_range[1]):
+                return result[score_range]
 
     def pretrain_DBN(self, MainWindow):
-        pretraining_epochs = 100
-        pretrain_lr = 0.01
-        batch_size = 4
-        k = 1
         trainFilePath = MainWindow.dialog_selectTrain.getPath()
         trainIndex = MainWindow.comboBox_indexName.currentIndex()
-
+        pretraining_epochs = int(MainWindow.lineEdit_epoch.text())
+        pretrain_lr = float(MainWindow.lineEdit_lr.text())
+        batch_size = int(MainWindow.lineEdit_batch.text())
         train_set_x, train_set_y, feaNum, rawdata = load_traindata(trainFilePath)
         # when we haven't trained this index, we trained it, otherwise refresh the datasets.
         if self.trained[trainIndex]:
@@ -381,6 +376,8 @@ class runDBN():
         else:
             self.datasets.append([(train_set_x, train_set_y)])
             self.rawdata.append(rawdata)
+            name = MainWindow.comboBox_indexName.currentText()
+            MainWindow.comboBox_indexName.setItemText(trainIndex, name + ' (*)')
 
         self.trained[trainIndex] = True
         self.n_train_batches[trainIndex] = train_set_x.get_value(borrow=True).shape[0] // batch_size
@@ -390,17 +387,23 @@ class runDBN():
 
         if MainWindow.checkBox_lv2.isChecked():
             hidden_layer_sizes.append(int(MainWindow.lineEdit_lv2.text()))
+
+        if MainWindow.checkBox_lv3.isChecked():
+            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv3.text()))
+
         # numpy random generator
         numpy_rng = numpy.random.RandomState(123)
         # construct the Deep Belief Network
         self.dbn[trainIndex] = DBN(numpy_rng=numpy_rng, n_ins=feaNum,
                                    hidden_layers_sizes=hidden_layer_sizes,
                                    n_outs=5)
+        # n_out=5, for we only have A+ A B C D.
 
         # start-snippet-2
         #########################
         # PRETRAINING THE MODEL #
         #########################
+        k = 1
         print('... getting the pretraining functions')
         pretraining_fns = self.dbn[trainIndex].pretraining_functions(train_set_x=train_set_x,
                                                                      batch_size=batch_size,
@@ -421,15 +424,15 @@ class runDBN():
         print('The pretraining code for file ' +
               'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
         # end-snippet-2
-        name = MainWindow.comboBox_indexName.currentText()
-        MainWindow.comboBox_indexName.setItemText(trainIndex, name + ' (*)')
 
-    def test_DBN(self, ui, outui, testFilePath, testIndex):
+    def test_DBN(self, MainWindow):
         batch_size = 4
         finetune_lr = 0.1
         training_epochs = 1000
-        # testfile = dialog_selectTest.getPath()
-        self.tested[testIndex] = True
+        testIndex = MainWindow.comboBox_testIndex.currentIndex()
+        testFilePath = MainWindow.dialog_selectTest.getPath()
+        if not self.tested[testIndex]:
+            self.tested[testIndex] = True
         test_set_x, test_set_y = load_testdata(testFilePath, self.rawdata[testIndex], batch_size)
         self.datasets[testIndex].append((test_set_x, test_set_y))
         # get the training, validation and testing function for the model
@@ -459,14 +462,14 @@ class runDBN():
         for eachbatch in predict_label:
             last_label.extend(eachbatch.tolist())
 
-        ui.lineEdit_result.setText(str(self.translate_result[last_label[-1]]))
-        outui.textEdit.append('指标名称 : {}'.format(ui.comboBox_testIndex.currentText()))
-        outui.textEdit.append('评估结果 : {}'.format(ui.lineEdit_result.text()))
-        outui.textEdit.append('指标权重 ：{}\n'.format(ui.lineEdit_indexWeight.text()))
-        self.weight.append(float(ui.lineEdit_indexWeight.text()))
+        MainWindow.lineEdit_result.setText(str(self.translate_result[last_label[-1]]))
+        # MainWindow.outui.textEdit.append('指标名称 : {}'.format(MainWindow.comboBox_testIndex.currentText()))
+        # MainWindow.outui.textEdit.append('评估结果 : {}'.format(MainWindow.lineEdit_result.text()))
+        # MainWindow.outui.textEdit.append('指标权重 ：{}\n'.format(MainWindow.indexweight[testIndex]))
+        self.print_result(MainWindow, MainWindow.comboBox_testIndex.currentText(), MainWindow.lineEdit_result.text(),
+                          MainWindow.indexweight[testIndex])
+        name = MainWindow.comboBox_testIndex.currentText()
+        MainWindow.comboBox_testIndex.setItemText(testIndex, name + ' (*)')
         self.score.append(self.scoretable[last_label[0]])
         if not (False in self.tested):
-            self.calc_totalscore()
-            self.calc_totalresult()
-            outui.textEdit.append('指标名称 : {}'.format(self.rootindex))
-            outui.textEdit.append('评估结果 : {}'.format(self.totalresult))
+            self.calc_totalscore(MainWindow)
