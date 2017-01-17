@@ -2,13 +2,16 @@ import json
 from collections import deque, OrderedDict
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QMainWindow, QMessageBox
 
 from DBN import runDBN
 from dialog import SelectDialog, SaveDialog
 from mainwindow import Ui_MainWindow
 from mythread import TrainThread, TestThread
 from outText import OutPutWindow
+
+
+# TODO: Batch evaluation
 
 
 class MainWindow(Ui_MainWindow):
@@ -28,17 +31,14 @@ class MainWindow(Ui_MainWindow):
         self.lineEdit_epoch.setText('100')
 
         self.dialog_loadindex = SelectDialog()  # select index file
-        self.push_selectIndex.clicked.connect(self.loadindex)
-        self.push_editIndex.clicked.connect(self.setindex)
-
-        self.push_editIndex.clicked.connect(lambda: self.dbn.setIndexname(self.indexname))
-
-        # self.command_startEvaluate.clicked.connect(
-        #     lambda: self.lineEdit_indexName_2.setText(self.comboBox_testIndex.currentText()))
-
         self.dialog_selectTrain = SelectDialog()
         self.dialog_selectTest = SelectDialog()
         self.dialog_save = SaveDialog()
+
+        # signal-slot connection
+        self.push_selectIndex.clicked.connect(self.loadindex)
+        self.push_editIndex.clicked.connect(self.setindex)
+        self.push_editIndex.clicked.connect(lambda: self.dbn.setIndexname(self.indexname))
 
         self.pushButton_selectTrain.clicked.connect(self.dialog_selectTrain.exec)
         self.pushButton_selectEvaluate.clicked.connect(self.dialog_selectTest.exec)
@@ -51,8 +51,16 @@ class MainWindow(Ui_MainWindow):
 
         self.command_startTrain.clicked.connect(self.trThread.start)
         self.command_startEvaluate.clicked.connect(self.teThread.start)
-
         self.push_retest.clicked.connect(self.retest)
+
+        self.dbn.train_finished.connect(self.handle_train_finished)
+        self.dbn.test_finished.connect(self.handle_test_finished)
+
+    def handle_train_finished(self):
+        QMessageBox.warning(QMessageBox(), "提示", "训练已完成")
+
+    def handle_test_finished(self):
+        QMessageBox.warning(QMessageBox(), "提示", "试验已完成")
 
     def getRootIndexName(self):
         root = self.tree_index.topLevelItem(0)

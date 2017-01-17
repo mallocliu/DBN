@@ -8,14 +8,14 @@ import timeit
 import numpy
 import theano
 import theano.tensor as T
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
+from openpyxl import load_workbook
 from theano.sandbox.rng_mrg import MRG_RandomStreams
 
 from logistic_sgd import LogisticRegression
 from mlp import HiddenLayer
 from rbm import RBM
-from utils import load_traindata, load_testdata
-
-
 # start-snippet-1
 
 
@@ -276,8 +276,14 @@ class DBN(object):
         return train_fn, test_score, test_label
 
 
-class runDBN():
+class runDBN(QObject):
+    train_finished = pyqtSignal()
+    test_finished = pyqtSignal()
+    lack_data = pyqtSignal()
+
+
     def __init__(self):
+        super().__init__()
         self.dbn = []
         self.datasets = []
         self.rawdata = []
@@ -304,6 +310,12 @@ class runDBN():
             3: '合格',
             4: '不合格'
         }
+
+    def handle_train_finished(self):
+        QMessageBox.information(QMessageBox(), "提示", "训练已完成")
+
+    def handle_test_finished(self):
+        QMessageBox.information(QMessageBox(), "提示", "试验已完成")
 
     def resetTest(self):
         self.totalresult = ''
@@ -342,6 +354,95 @@ class runDBN():
                 self.print_result(MainWindow, node.text(0), result, node.text(1))
             score = tmpscore
 
+    def load_traindata(self, dataset):
+        ''' Loads the dataset
+
+        :type dataset: string
+        :param dataset: the path to the dataset
+        '''
+
+        wb = load_workbook(filename=dataset, read_only=True)
+        ws = wb['Sheet1']
+        feaNum = ws.max_column - 1
+        columns = [chr(ord('A') + i) for i in range(feaNum)]
+        data = list()
+        labels = list()
+        for row in range(2, ws.max_row + 1):
+            tmp = list()
+            for column in columns:  # Here you can add or reduce the columns
+                cell_name = "{}{}".format(column, row)
+                tmp.append(ws[cell_name].value)
+            data.append(tmp)
+            cell_name = "{}{}".format(chr(ord(columns[-1]) + 1), row)
+            labels.append(ws[cell_name].value - 1)
+        data = numpy.array(data)
+        labels = numpy.array(labels)
+        labels = labels.T
+
+        dataSize = data.shape
+        minval = data.min(axis=0)
+        maxval = data.max(axis=0)
+        rawdata = data.copy()
+
+        ###normaolization
+        for row in range(0, dataSize[0]):
+            for col in range(0, dataSize[1]):
+                data[row][col] = (data[row][col] - minval[col]) / (maxval[col] - minval[col])
+
+        train_set = (data, labels)
+        train_set_x, train_set_y = shared_dataset(train_set)
+        return train_set_x, train_set_y, feaNum, rawdata
+
+    def load_testdata(self, dataset, data, batch_size):
+
+        ''' Loads the dataset
+
+        :type dataset: string
+        :param dataset: the path to the dataset
+        '''
+
+        #############
+        # LOAD DATA #
+        #############
+        # Load the dataset
+        # train_set, test_set format: tuple(input, target)
+        # input is a numpy.ndarray of 2 dimensions (a matrix)
+        # where each row corresponds to an example. target is a
+        # numpy.ndarray of 1 dimension (vector) that has the same length as
+        # the number of rows in the input. It should give the target
+        # to the example with the same index in the input.
+
+        wb = load_workbook(filename=dataset, read_only=True)
+        ws = wb['Sheet1']
+        testdata = list()
+        labels = [0 for _ in range(batch_size)]  # give all the test label with 0 just for completeness
+        columns = [chr(ord('A') + i) for i in range(ws.max_column)]
+        tmp = []
+        for column in columns:
+            cell_name = "{}{}".format(column, 2)  # give 2 because we only have 1 test sample
+            tmp.append(ws[cell_name].value)
+        testdata.append(tmp)
+        testdata = numpy.array(testdata)
+        labels = numpy.array(labels)
+        data = numpy.vstack((data, testdata))
+        dataSize = data.shape
+
+        # print(testdataSize)
+        minval = data.min(axis=0)
+        maxval = data.max(axis=0)
+
+        ###normaolization
+        for col in range(dataSize[1]):
+            testdata[0][col] = (testdata[0][col] - minval[col]) / (maxval[col] - minval[col])
+
+        for i in range(batch_size - 1):
+            testdata = numpy.row_stack([testdata, testdata])
+
+        test_set = (testdata, labels)
+
+        test_set_x, test_set_y = shared_dataset(test_set)
+        return test_set_x, test_set_y
+
     def print_result(self, MainWindow, index, result, weight):
         MainWindow.outui.textEdit.append('指标名称 : {}'.format(index))
         MainWindow.outui.textEdit.append('评估结果 : {}'.format(result))
@@ -368,7 +469,7 @@ class runDBN():
         pretraining_epochs = int(MainWindow.lineEdit_epoch.text())
         pretrain_lr = float(MainWindow.lineEdit_lr.text())
         batch_size = int(MainWindow.lineEdit_batch.text())
-        train_set_x, train_set_y, feaNum, rawdata = load_traindata(trainFilePath)
+        train_set_x, train_set_y, feaNum, rawdata = self.load_traindata(trainFilePath)
         # when we haven't trained this index, we trained it, otherwise refresh the datasets.
         if self.trained[trainIndex]:
             self.datasets[trainIndex] = [(train_set_x, train_set_y)]
@@ -423,6 +524,7 @@ class runDBN():
         end_time = timeit.default_timer()
         print('The pretraining code for file ' +
               'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
+        self.train_finished.emit()
         # end-snippet-2
 
     def test_DBN(self, MainWindow):
@@ -433,7 +535,7 @@ class runDBN():
         testFilePath = MainWindow.dialog_selectTest.getPath()
         if not self.tested[testIndex]:
             self.tested[testIndex] = True
-        test_set_x, test_set_y = load_testdata(testFilePath, self.rawdata[testIndex], batch_size)
+        test_set_x, test_set_y = self.load_testdata(testFilePath, self.rawdata[testIndex], batch_size)
         self.datasets[testIndex].append((test_set_x, test_set_y))
         # get the training, validation and testing function for the model
         print('... getting the finetuning functions')
@@ -471,5 +573,34 @@ class runDBN():
         name = MainWindow.comboBox_testIndex.currentText()
         MainWindow.comboBox_testIndex.setItemText(testIndex, name + ' (*)')
         self.score.append(self.scoretable[last_label[0]])
+        self.test_finished.emit()
         if not (False in self.tested):
             self.calc_totalscore(MainWindow)
+
+
+def shared_dataset(data_xy, borrow=True):
+    """ Function that loads the dataset into shared variables
+
+    The reason we store our dataset in shared variables is to allow
+    Theano to copy it into the GPU memory (when code is run on GPU).
+    Since copying data into the GPU is slow, copying a minibatch everytime
+    is needed (the default behaviour if the data is not in a shared
+    variable) would lead to a large decrease in performance.
+    """
+
+    data_x, data_y = data_xy
+
+    shared_x = theano.shared(numpy.asarray(data_x,
+                                           dtype=theano.config.floatX),
+                             borrow=borrow)
+    shared_y = theano.shared(numpy.asarray(data_y,
+                                           dtype=theano.config.floatX),
+                             borrow=borrow)
+    # When storing data on the GPU it has to be stored as floats
+    # therefore we will store the labels as ``floatX`` as well
+    # (``shared_y`` does exactly that). But during our computations
+    # we need them as ints (we use labels as index, and if they are
+    # floats it doesn't make sense) therefore instead of returning
+    # ``shared_y`` we will have to cast it to int. This little hack
+    # lets ous get around this issue
+    return shared_x, T.cast(shared_y, 'int32')
