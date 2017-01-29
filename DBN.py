@@ -16,6 +16,8 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams
 from logistic_sgd import LogisticRegression
 from mlp import HiddenLayer
 from rbm import RBM
+
+
 # start-snippet-1
 
 
@@ -279,37 +281,49 @@ class DBN(object):
 class runDBN(QObject):
     train_finished = pyqtSignal()
     test_finished = pyqtSignal()
-    lack_data = pyqtSignal()
+    loading_train_error = pyqtSignal(str)
+    loading_test_error = pyqtSignal(str)
+    scoretable = {
+        0: 95,
+        1: 85,
+        2: 75,
+        3: 65,
+        4: 55,
+    }
 
+    translate_result = {
+        0: '优秀',
+        1: '良好',
+        2: '中等',
+        3: '合格',
+        4: '不合格'
+    }
 
     def __init__(self):
         super().__init__()
-        self.dbn = []
+        self.dbn = DBN(numpy_rng=numpy.random.RandomState(123))
         self.datasets = []
-        self.rawdata = []
-        self.n_train_batches = []
-        self.totalscore = 0
+        self.minval = None
+        self.maxval = None
+        self.train_finished.connect(self.handle_train_finished)
+        self.loading_train_error.connect(self.handle_loading_train_error)
+        self.n_train_batches = 0
+        self.hidden_layer_sizes = []
+        self.pretrain_epoch = 0
+        self.pretrain_lr = 0.0
+        self.batch_size = 0
+        self.trainFilePath = ''
         self.totalresult = ''
-        self.score = []
-        self.indexname = []
+        self.score = 0
+        self.indexname = set()
         self.rootindex = ''
-        self.trained = []
-        self.tested = []
-        self.scoretable = {
-            0: 95,
-            1: 85,
-            2: 75,
-            3: 65,
-            4: 55,
-        }
 
-        self.translate_result = {
-            0: '优秀',
-            1: '良好',
-            2: '中等',
-            3: '合格',
-            4: '不合格'
-        }
+    def __setstate__(self, state):
+        super().__init__()
+        self.__dict__.update(state)
+
+    def handle_loading_train_error(self, message):
+        QMessageBox.warning(QMessageBox(), 'error', message)
 
     def handle_train_finished(self):
         QMessageBox.information(QMessageBox(), "提示", "训练已完成")
@@ -317,42 +331,26 @@ class runDBN(QObject):
     def handle_test_finished(self):
         QMessageBox.information(QMessageBox(), "提示", "试验已完成")
 
-    def resetTest(self):
-        self.totalresult = ''
-        self.totalscore = 0
-        self.score = []
-        self.tested = [False for _ in self.indexname]
-        self.datasets = [[data[0]] for data in self.datasets]
-
-    def setIndexname(self, index):
-        self.indexname = index
-        self.trained = [False for _ in index]
-        self.tested = [False for _ in index]
-        self.n_train_batches = [0 for _ in index]
-        self.dbn = [DBN(numpy_rng=numpy.random.RandomState(123)) for _ in index]
-
-    def setRootIndex(self, index):
-        self.rootindex = index
-
-    def calc_totalscore(self, MainWindow):
-        lv = MainWindow.level - 1
-        score = self.score
-        while lv != 1:  # not in the root level
-            lv -= 1
-            tmpscore = []
-            fatherwidget = MainWindow.get_all_level_k_widget(lv)
-            for node in fatherwidget:
-                tmp = 0.0
-                sum_weight = 0
-                childNum = node.childCount()
-                for val in range(childNum):
-                    childnode = node.child(val)
-                    tmp += score[val] * int(childnode.text(1))
-                    sum_weight += int(childnode.text(1))
-                tmpscore.append(tmp / sum_weight)
-                result = self.calc_result(tmpscore[-1])
-                self.print_result(MainWindow, node.text(0), result, node.text(1))
-            score = tmpscore
+    def isValidTrainData(self, ws):
+        flag = True
+        if ws['B2'].value != self.rootindex:
+            self.loading_train_error.emit('文件名称与待训练指标名称不符')
+            flag = False
+        if ws['D2'].value != '样本数据':
+            self.loading_train_error.emit('该文件数据不是样本数据')
+            flag = False
+        feaNum = len(self.indexname)
+        columns = [chr(ord('B') + i) for i in range(feaNum)]  # data range in file which we need to read
+        for column in columns:
+            name = ws['{}5'.format(column)].value
+            indextype = ws['{}6'.format(column)].value
+            if name not in self.indexname:
+                self.loading_train_error.emit('子指标名称与指标体系不一致')
+                flag = False
+            if indextype != '定量数据':
+                self.loading_train_error.emit('子指标类型出现非定量数据')
+                flag = False
+        return flag
 
     def load_traindata(self, dataset):
         ''' Loads the dataset
@@ -361,13 +359,15 @@ class runDBN(QObject):
         :param dataset: the path to the dataset
         '''
 
-        wb = load_workbook(filename=dataset, read_only=True)
-        ws = wb['Sheet1']
-        feaNum = ws.max_column - 1
-        columns = [chr(ord('A') + i) for i in range(feaNum)]
+        ws = load_workbook(filename=dataset, read_only=True)['Sheet1']
+        if not self.isValidTrainData(ws):
+            return
+        feaNum = len(self.indexname)
+        columns = [chr(ord('B') + i) for i in range(feaNum)] # data range in file which we need to read
+
         data = list()
         labels = list()
-        for row in range(2, ws.max_row + 1):
+        for row in range(7, ws.max_row + 1):
             tmp = list()
             for column in columns:  # Here you can add or reduce the columns
                 cell_name = "{}{}".format(column, row)
@@ -376,24 +376,23 @@ class runDBN(QObject):
             cell_name = "{}{}".format(chr(ord(columns[-1]) + 1), row)
             labels.append(ws[cell_name].value - 1)
         data = numpy.array(data)
-        labels = numpy.array(labels)
-        labels = labels.T
+        labels = numpy.array(labels).T
 
         dataSize = data.shape
         minval = data.min(axis=0)
         maxval = data.max(axis=0)
-        rawdata = data.copy()
 
         ###normaolization
-        for row in range(0, dataSize[0]):
-            for col in range(0, dataSize[1]):
+        for row in range(dataSize[0]):
+            for col in range(dataSize[1]):
                 data[row][col] = (data[row][col] - minval[col]) / (maxval[col] - minval[col])
 
         train_set = (data, labels)
         train_set_x, train_set_y = shared_dataset(train_set)
-        return train_set_x, train_set_y, feaNum, rawdata
+        return train_set_x, train_set_y, minval, maxval
 
-    def load_testdata(self, dataset, data, batch_size):
+    # todo: write loading test data process
+    def load_testdata(self, ws, column):
 
         ''' Loads the dataset
 
@@ -411,172 +410,90 @@ class runDBN(QObject):
         # numpy.ndarray of 1 dimension (vector) that has the same length as
         # the number of rows in the input. It should give the target
         # to the example with the same index in the input.
-
-        wb = load_workbook(filename=dataset, read_only=True)
-        ws = wb['Sheet1']
-        testdata = list()
-        labels = [0 for _ in range(batch_size)]  # give all the test label with 0 just for completeness
-        columns = [chr(ord('A') + i) for i in range(ws.max_column)]
-        tmp = []
-        for column in columns:
-            cell_name = "{}{}".format(column, 2)  # give 2 because we only have 1 test sample
-            tmp.append(ws[cell_name].value)
-        testdata.append(tmp)
-        testdata = numpy.array(testdata)
+        sampleNum = ws.max_row - 6
+        res = self.batch_size - sampleNum % self.batch_size
+        if res == self.batch_size:
+            res = 0
+        labels = [0 for _ in range(sampleNum + res)]  # give all the test label with 0 just for completeness
+        columns = [chr(ord(column) + _) for _ in range(len(self.indexname))]
+        testdata = [ws['{}{}'.format(c, r)].value for r in range(7, ws.max_row+1) for c in columns]
+        remdata = [ws['{}{}'.format(c, ws.max_row)].value for c in columns]
+        for _ in range(res):
+            testdata.extend(remdata)
+        testdata = numpy.array(testdata).reshape(sampleNum + res, len(self.indexname))
         labels = numpy.array(labels)
-        data = numpy.vstack((data, testdata))
-        dataSize = data.shape
+        dataSize = testdata.shape
 
-        # print(testdataSize)
-        minval = data.min(axis=0)
-        maxval = data.max(axis=0)
+        minval = testdata.min(axis=0)
+        maxval = testdata.max(axis=0)
 
         ###normaolization
         for col in range(dataSize[1]):
-            testdata[0][col] = (testdata[0][col] - minval[col]) / (maxval[col] - minval[col])
-
-        for i in range(batch_size - 1):
-            testdata = numpy.row_stack([testdata, testdata])
+            for row in range(dataSize[0]):
+                testdata[row][col] = (testdata[row][col] - min(minval[col], self.minval[col])) / \
+                                     (max(maxval[col], self.maxval[col]) - min(minval[col], self.minval[col]))
 
         test_set = (testdata, labels)
 
         test_set_x, test_set_y = shared_dataset(test_set)
         return test_set_x, test_set_y
 
-    def print_result(self, MainWindow, index, result, weight):
-        MainWindow.outui.textEdit.append('指标名称 : {}'.format(index))
-        MainWindow.outui.textEdit.append('评估结果 : {}'.format(result))
-        MainWindow.outui.textEdit.append('指标权重 ：{}\n'.format(weight))
-
-    def calc_result(self, score):
-        result = {
-            (90, 100): '优秀',
-            (80, 90): '良好',
-            (70, 80): '中等',
-            (60, 70): '合格',
-            (0, 60): '不合格'
-        }
-        key = result.keys()
-        key = [i for i in key]
-        key.sort(key=lambda x: x[0], reverse=True)
-        for score_range in key:
-            if score in range(score_range[0], score_range[1]):
-                return result[score_range]
-
-    def pretrain_DBN(self, MainWindow):
-        trainFilePath = MainWindow.dialog_selectTrain.getPath()
-        trainIndex = MainWindow.comboBox_indexName.currentIndex()
-        pretraining_epochs = int(MainWindow.lineEdit_epoch.text())
-        pretrain_lr = float(MainWindow.lineEdit_lr.text())
-        batch_size = int(MainWindow.lineEdit_batch.text())
-        train_set_x, train_set_y, feaNum, rawdata = self.load_traindata(trainFilePath)
+    def pretrain_DBN(self):
+        train_set_x, train_set_y, minval, maxval = self.load_traindata(self.trainFilePath)
         # when we haven't trained this index, we trained it, otherwise refresh the datasets.
-        if self.trained[trainIndex]:
-            self.datasets[trainIndex] = [(train_set_x, train_set_y)]
-            self.rawdata[trainIndex] = rawdata
-        else:
-            self.datasets.append([(train_set_x, train_set_y)])
-            self.rawdata.append(rawdata)
-            name = MainWindow.comboBox_indexName.currentText()
-            MainWindow.comboBox_indexName.setItemText(trainIndex, name + ' (*)')
 
-        self.trained[trainIndex] = True
-        self.n_train_batches[trainIndex] = train_set_x.get_value(borrow=True).shape[0] // batch_size
-        hidden_layer_sizes = []
-        if MainWindow.checkBox_lv1.isChecked():
-            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv1.text()))
-
-        if MainWindow.checkBox_lv2.isChecked():
-            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv2.text()))
-
-        if MainWindow.checkBox_lv3.isChecked():
-            hidden_layer_sizes.append(int(MainWindow.lineEdit_lv3.text()))
+        self.datasets = [(train_set_x, train_set_y)]
+        self.minval = minval
+        self.maxval = maxval
+        self.n_train_batches = train_set_x.get_value(borrow=True).shape[0] // self.batch_size
 
         # numpy random generator
         numpy_rng = numpy.random.RandomState(123)
         # construct the Deep Belief Network
-        self.dbn[trainIndex] = DBN(numpy_rng=numpy_rng, n_ins=feaNum,
-                                   hidden_layers_sizes=hidden_layer_sizes,
-                                   n_outs=5)
+        self.dbn = DBN(numpy_rng=numpy_rng, n_ins=len(self.indexname),
+                       hidden_layers_sizes=self.hidden_layer_sizes,
+                       n_outs=5)
         # n_out=5, for we only have A+ A B C D.
-
-        # start-snippet-2
-        #########################
-        # PRETRAINING THE MODEL #
-        #########################
         k = 1
         print('... getting the pretraining functions')
-        pretraining_fns = self.dbn[trainIndex].pretraining_functions(train_set_x=train_set_x,
-                                                                     batch_size=batch_size,
-                                                                     k=k)
+        pretraining_fns = self.dbn.pretraining_functions(train_set_x=train_set_x,
+                                                         batch_size=self.batch_size,
+                                                         k=k)
         print('... pre-training the model')
-        start_time = timeit.default_timer()
         # Pre-train layer-wise
-        for i in range(self.dbn[trainIndex].n_layers):
-            for epoch in range(pretraining_epochs):
+        for i in range(self.dbn.n_layers):
+            for epoch in range(self.pretrain_epoch):
                 c = []
-                for batch_index in range(self.n_train_batches[trainIndex]):
+                for batch_index in range(self.n_train_batches):
                     c.append(pretraining_fns[i](index=batch_index,
-                                                lr=pretrain_lr))
-                print('Pre-training layer %i, epoch %d, cost ' % (i, epoch), end=' ')
-                print(numpy.mean(c))
+                                                lr=self.pretrain_lr))
 
-        end_time = timeit.default_timer()
-        print('The pretraining code for file ' +
-              'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
         self.train_finished.emit()
-        # end-snippet-2
 
-    def test_DBN(self, MainWindow):
-        batch_size = 4
+    def test_DBN(self):
         finetune_lr = 0.1
         training_epochs = 1000
-        testIndex = MainWindow.comboBox_testIndex.currentIndex()
-        testFilePath = MainWindow.dialog_selectTest.getPath()
-        if not self.tested[testIndex]:
-            self.tested[testIndex] = True
-        test_set_x, test_set_y = self.load_testdata(testFilePath, self.rawdata[testIndex], batch_size)
-        self.datasets[testIndex].append((test_set_x, test_set_y))
         # get the training, validation and testing function for the model
         print('... getting the finetuning functions')
-        train_fn, test_model, predict_model = self.dbn[testIndex].build_finetune_functions(
-            datasets=self.datasets[testIndex],
-            batch_size=batch_size,
+        train_fn, test_model, predict_model = self.dbn.build_finetune_functions(
+            datasets=self.datasets,
+            batch_size=self.batch_size,
             learning_rate=finetune_lr
         )
 
         print('... finetuning the model')
-        # early-stopping parameters
-        # look as this many examples regardless
-        start_time = timeit.default_timer()
         epoch = 0
         while (epoch < training_epochs):
             epoch = epoch + 1
-            for minibatch_index in range(self.n_train_batches[testIndex]):
+            for minibatch_index in range(self.n_train_batches):
                 train_fn(minibatch_index)
-
-        end_time = timeit.default_timer()
-        print('The fine tuning code for file ' +
-              'ran for %.2fm' % ((end_time - start_time) / 60.), file=sys.stderr)
 
         predict_label = predict_model()
         last_label = []
         for eachbatch in predict_label:
             last_label.extend(eachbatch.tolist())
 
-        MainWindow.lineEdit_result.setText(str(self.translate_result[last_label[-1]]))
-        # MainWindow.outui.textEdit.append('指标名称 : {}'.format(MainWindow.comboBox_testIndex.currentText()))
-        # MainWindow.outui.textEdit.append('评估结果 : {}'.format(MainWindow.lineEdit_result.text()))
-        # MainWindow.outui.textEdit.append('指标权重 ：{}\n'.format(MainWindow.indexweight[testIndex]))
-        self.print_result(MainWindow, MainWindow.comboBox_testIndex.currentText(), MainWindow.lineEdit_result.text(),
-                          MainWindow.indexweight[testIndex])
-        name = MainWindow.comboBox_testIndex.currentText()
-        MainWindow.comboBox_testIndex.setItemText(testIndex, name + ' (*)')
-        self.score.append(self.scoretable[last_label[0]])
-        self.test_finished.emit()
-        if not (False in self.tested):
-            self.calc_totalscore(MainWindow)
-
+        return last_label
 
 def shared_dataset(data_xy, borrow=True):
     """ Function that loads the dataset into shared variables
